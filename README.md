@@ -5,21 +5,33 @@
 
 **defines-provenance** is dependency tracking for markdown files in your library — *declared, not inferred*.
 
-Your agent's rules start quietly contradicting each other. You fix one file; the others that referenced
-it silently rot — and nothing tells you. Past ~100 files you can't even tell which file is a rule's
-*authoritative source* and which just *mentions* it. It's not only agent rules — wherever one file is the
-*source of truth* others must track (a product spec, a company handbook, API docs), the same drift creeps
-in the moment you change it.
+Your agent's rules start quietly contradicting each other: you fix one file, and the others that
+referenced it silently rot. Past ~100 files you can't even tell which file is a concept's *authoritative
+source* and which just *mentions* it. Not only agent rules — any library where one file is the *source of
+truth* others track (a spec, a handbook, API docs) drifts the moment you change it.
 
-The usual tools don't help. You reach for a knowledge-graph, an embedding tool, your `[[wikilink]]`
-backlinks — and they hand you **similarity**: every file that says "auth" wired to every other.
-Beautiful, and useless for the one question you actually have: *when I change this, what depends on it?*
+The fix is two HTML comments — one file **owns** a concept; the rest **cite** it:
 
-> **Similarity is not dependency** — and dependency can't be inferred, only **declared**.
+```text
+# rules/auth.md  —  owns the concept           (the SOURCE — its one home)
+<!-- DEFINES: auth-policy -->
+
+# testing.md  —  derives from it               (DERIVED)
+<!-- DEPENDS_ON: rules/auth.md -->     ← cites auth-policy; must track it
+```
+
+Edit a SOURCE ▸ `python3 defines_provenance.py --dependents rules/auth.md` hands you every file that
+cited it, to re-check — and `--check` fails CI if any cited path dangles. (Who wins a conflict? the
+SOURCE — but that call is yours, not the tool's.)
+
+It's the one thing *similarity* can't give you. A knowledge-graph or embeddings **infer** which files
+look alike; `[[wikilink]]` backlinks **declare** that two files relate — but neither says **which is the
+SOURCE and which must track it.** Provenance is declared, directional, and owned — a similarity statistic
+or a backlink web gives you none of that.
 
 ```mermaid
 flowchart LR
-    subgraph sim["❌ SIMILARITY — a graph / embedding tool"]
+    subgraph sim["❌ SIMILARITY / ASSOCIATION — embedding, graph, or backlinks"]
         direction TB
         b(["rules/commit.md"]):::s
         a(["CLAUDE.md"]):::s
@@ -41,10 +53,6 @@ flowchart LR
     classDef d fill:#eff6ff,stroke:#3b82f6,color:#1e3a8a
     classDef src fill:#dcfce7,stroke:#16a34a,color:#14532d
 ```
-
-That's the whole idea behind **defines-provenance**: you *declare* which file is the *source* of a
-concept and which merely *depend on* it, and a checker verifies every link mechanically — so they never
-silently rot.
 
 ## Try it in 10 seconds
 
@@ -84,6 +92,17 @@ A concept has exactly **one home**. The file that owns it declares `<!-- DEFINES
 **SOURCE** of X; every file built on it declares `<!-- DEPENDS_ON: <source> -->` — it is **DERIVED**.
 One rule makes it pay: **SOURCE overrides DERIVED** — change the source and the derived files get pulled
 back in sync, never the reverse. (One screen: **[CONVENTION.md](CONVENTION.md)**.)
+
+Behind the two markers, four parties each declare exactly one thing:
+
+| who | declares | what it buys |
+|---|---|---|
+| **`DEFINES: X`** in the SOURCE | this file owns concept `X` — its one home | provenance: the authoritative home + a legal vocabulary of concept names |
+| **`#X`** on a `DEPENDS_ON` edge | which of the source's concepts this file tracks | precision: who gets pulled in to re-check when `X` changes |
+| **you**, editing the SOURCE | which concept *this* edit touched | the one fact only a human knows |
+| **the checker** | each `#X` is a real concept the source `DEFINES`; joins "you changed `X`" × every edge | verification + filtering — never *which* concept changed (it can't infer that) |
+
+So `DEFINES` isn't there to detect what changed (it can't) — it declares the authoritative home and gives `#X` something real to point at.
 
 It rots **two** ways — you **change** a SOURCE and its dependents fall behind, or you **add** a file and it
 never gets declared — so it has **two upkeep moments**, both wired into your runtime **by your agent (you
@@ -175,15 +194,9 @@ $ echo '{"tool_name":"Write","tool_input":{"file_path":"examples/clean/new-rule.
 - **N=1.** Built and run on one person's library (the numbers above). *"Proven effective"* is a claim this
   tool hasn't earned yet — adopt the idea, measure it on your own data.
 - **It checks link existence, not whether your SOURCE/DERIVED labelling is *correct*.** It won't tell you a
-  concept's home is the wrong file — only that the links you wrote still resolve. Same for a `#concept` that
-  points at a valid-but-wrong concept: `--check` stays silent, and the **propagation content-grep** is what
-  catches it (the agent greps the concept's keywords and re-tags on the next change).
-- **Concept-scoping is opt-in; whole-file is the default.** It assumes single-slug concept names
-  (`session-rules`), so a library that names concepts in prose gives them a slug first (the description can
-  ride in a trailing `(…)`). The mechanism is self-tested **and dogfooded on the author's own multi-concept
-  sources** (`vault-iterate`, `plan-gates`) — focused dependents (ADR/decision docs, 1 doc = 1 concept) scope
-  cleanly; broad consumers stay whole-file via the fail-safe. Reach for it on genuinely multi-concept SOURCEs;
-  whole-file `DEPENDS_ON` is the always-safe default.
+  concept's home is the wrong file — only that the links you wrote still resolve. *(A `#concept` pointing at a
+  valid-but-wrong sibling slips through the same way; the propagation content-grep is the backstop.)*
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

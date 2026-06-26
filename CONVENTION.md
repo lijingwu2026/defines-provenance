@@ -4,8 +4,8 @@
 
 A two-line, hand-written convention for declaring **structural provenance** in a library of
 markdown rules, specs, or docs — so you (and your agent) can answer *"which file is the SOURCE
-of this concept, and which files DEPEND on it?"* deterministically, instead of guessing from
-semantic similarity.
+of this concept, and which files DEPEND on it?"* deterministically — instead of inferring it from
+similarity, or hand-wiring it as an undirected backlink web.
 
 It is just two HTML comments. No plugin, no build step, no database. The companion
 `defines_provenance.py` checks the convention (it never writes your files); a small new-file hook
@@ -32,11 +32,18 @@ title: Auth policy
   If two files disagree about `X`, the one that DEFINES it wins. Comma / `，` / `、` separated.
 - **`<!-- DEPENDS_ON: <path> -->`** — *this file DERIVES from / references that SOURCE.*
   If the SOURCE changes, this file may need to be updated. The value is a path (or several), e.g.
-  `rules/base-policy.md` as in the example above. A path **may** optionally suffix `#concept` — a slug
-  the target's `DEFINES` declares — to scope the dependency to just that one concept
-  (`rules/base-policy.md#session-rules`); a bare path means whole-file, the always-relevant default.
+  `rules/base-policy.md` as in the example above. A path may suffix `#concept` — a slug the target's
+  `DEFINES` declares — to scope the dependency to one concept (`rules/base-policy.md#session-rules`).
+  **Scope a focused dependent at creation** (one that derives from just one of the SOURCE's concepts); a
+  **broad consumer** stays a bare path — whole-file, the always-safe default.
 
 That is the whole vocabulary — two markers; the optional `#concept` scope is the one refinement.
+
+**Think of it as a dictionary.** `DEFINES: X` is the **dictionary entry** — this file owns concept `X`;
+every other mention defers to it. `DEPENDS_ON` is a **citation** of an entry, in three forms: the **whole
+file** (`B`), a **single concept** (`B#X`), or **several** (multiple `DEPENDS_ON` lines — `B#X` + `C#Y`,
+or `B#X` + `B#Y` to track two of B's concepts but not the rest). The checker just verifies each citation
+points at something real — the path resolves, and a `#X` is one the entry actually `DEFINES`.
 
 ### Which marker does the work — and when to add each
 
@@ -51,6 +58,17 @@ The two markers are **not symmetric**:
   — powering the human SOURCE-overrides-DERIVED tie-break, not the dependency graph. `--check` resolves
   the *paths* in either marker; a bare `DEFINES` concept name (no `/`, no extension) is free text that
   no check constrains.
+
+Four parties each declare one thing — which is why nothing here is redundant:
+
+| who | declares | what it buys |
+|---|---|---|
+| **`DEFINES: X`** (in the SOURCE) | the SOURCE owns concept `X` — its one home | provenance (the authoritative home) + a legal dictionary of concept names |
+| **`#X`** on a `DEPENDS_ON` edge | which of the SOURCE's concepts this dependent tracks | triage precision — *who* gets pulled in to re-check when `X` changes |
+| **you**, editing the SOURCE | which concept *this* edit changed | the one bit only a human knows |
+| **the checker** | each `#X` is a real entry in the target's `DEFINES`; joins "you changed `X`" × every edge's `#X` | verification + filtering |
+
+`DEFINES` is never there to *detect which concept changed* — that's the `declare, don't infer` line the tool won't cross. It (1) declares `X`'s authoritative home (provenance) and (2) gives `#X` a real dictionary to check against. Precision lives on the dependent's side, ownership on the SOURCE's, change-detection in your head.
 
 So tag a file only when it passes a one-line test:
 
@@ -68,9 +86,10 @@ links; leave the rest untagged.
 > **SOURCE overrides DERIVED.** A concept has exactly one home (the file that `DEFINES` it).
 > Every other mention is `DERIVED` and must stay in sync with the home — never the other way around.
 
-This is the thing semantic search cannot give you. Two files can be semantically near-identical and
-yet independent; two files can read as totally unrelated and yet one hard-depends on the other.
-**Dependency is a human-declared structure, not a textual statistic** — so it has to be *written down*.
+This is the thing **no similarity graph — and no backlink web — gives you.** Two files can be semantically
+near-identical yet independent; two can read as unrelated yet one hard-depends on the other; and a backlink
+that says they *relate* never says **which is the SOURCE and which must track it.**
+**Dependency is a human-declared, directional structure — not a textual statistic, not an undirected web** — so it has to be *written down*.
 Once it is written down, a 200-line script can mechanically guarantee that every declared link still
 points at something real.
 
@@ -95,11 +114,9 @@ Severity:
 `--report`, never a merge-blocker).
 
 It does **not** check semantics, ownership conflicts, or whether your SOURCE/DERIVED labelling is
-*correct* — only that the links are not dangling. In particular a `#concept` that names a *valid but
-wrong* concept (one the target really DEFINES, just not the one this file derives from) passes silently —
-no deterministic check can catch a wrong-but-valid scope; that stays your judgement (the propagation
-content-grep below is the mitigation). It is a backstop for human forgetfulness (moved a file, fixed a
-typo, renamed a dir), not a linter for your ideas.
+*correct* — only that the links are not dangling. *(One miss it can't catch: a `#concept` naming a
+valid-but-wrong concept passes silently — the propagation content-grep is the mitigation.)* It is a
+backstop for human forgetfulness (moved a file, fixed a typo, renamed a dir), not a linter for your ideas.
 
 ### Escapes (for the inevitable edge cases)
 
@@ -160,11 +177,12 @@ the story). It demonstrably keeps annotation **coverage** high and catches **dan
 or across other people's corpora. It is a small sharp tool that earns its keep; it is not a proven
 methodology. Adopt the *idea* (declare provenance, check it mechanically); measure it on your own data.
 
-The **concept-scope** refinement (`#concept`) is **opt-in**: declare a single-slug concept the SOURCE's
-`DEFINES` carries, and an edge can depend on just that concept (whole-file `DEPENDS_ON` stays the always-safe
-default). It needs a **single-slug** concept name as a precondition — a SOURCE that names concepts in prose
-gives them a slug first (the description can ride along in a trailing `(…)`), and an edge that carries its own
-trailing prose annotation must put the `#concept` last or stay whole-file. It is mechanism-tested **and
+The **concept-scope** refinement (`#concept`) is **scoped at creation, by default** for focused dependents —
+not an opt-in afterthought: when a doc derives from just one concept the SOURCE's `DEFINES` carries, scope
+its edge to that concept then; whole-file `DEPENDS_ON` stays the always-safe default for broad consumers,
+with no re-tag burden later. It needs a **single-slug** concept name as a precondition: a SOURCE that names its concepts in prose gives
+them a slug first (the description can ride in a trailing `(…)`). And keep `#concept` as the edge's **last**
+token — an edge with its own trailing prose annotation must put `#concept` last, or else stay whole-file. It is mechanism-tested **and
 dogfooded on the author's own multi-concept sources** (`vault-iterate`, `plan-gates`): focused dependents —
 e.g. ADR/decision docs where one doc tracks one concept — scope cleanly, while broad consumers that depend on
 many concepts stay whole-file through the fail-safe (the correct outcome, not a miss). Its mis-attribution

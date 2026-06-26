@@ -11,10 +11,10 @@ the heading below is the **artifact release** version. The two `examples/hooks/`
 (`defines_trigger_hook.py`, `defines_tag_nudge_hook.py`) are **unversioned reference files** —
 copy-and-adapt examples, not independently-released components.
 
-## [0.3.0] — concept-scoped DEPENDS_ON (opt-in)
+## [0.3.0] — concept-scoped DEPENDS_ON
 
 ### Added
-- **`defines_provenance.py` (0.2.2 → 0.3.0) — opt-in concept-scoped `DEPENDS_ON`.** An edge MAY suffix
+- **`defines_provenance.py` (0.2.2 → 0.3.0) — concept-scoped `DEPENDS_ON` (scope a focused dependent at creation).** An edge MAY suffix
   `#concept` (a slug the target's `DEFINES` declares) to scope a dependency to one concept —
   `rules/base-policy.md#session-rules`. A bare `path` is whole-file and stays the always-flagged
   **default**; unscoped behaviour is byte-identical to 0.2.x, so this is fully backward-compatible. New

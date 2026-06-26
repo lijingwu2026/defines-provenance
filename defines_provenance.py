@@ -4,8 +4,9 @@
 A small, dependency-free script that scans a tree of markdown (and other text) files
 for `<!-- DEFINES: X -->` / `<!-- DEPENDS_ON: Y -->` header annotations and verifies
 that every path they reference actually exists. It is the deterministic backstop for a
-hand-written convention: semantic similarity is NOT structural dependency — dependency
-has to be *declared*, and once declared it can be *mechanically checked*.
+hand-written convention: neither semantic similarity (inferred) nor a backlink web (undirected) is
+structural dependency — dependency has to be *declared*, *directional*, and *owned* (which file is the
+SOURCE), and once declared it can be *mechanically checked*.
 
 See CONVENTION.md for what the markers mean and README.md for the story behind them.
 
@@ -44,10 +45,10 @@ See CONVENTION.md for what the markers mean and README.md for the story behind t
   python3 defines_provenance.py --dependents rules/auth.md --concept session-rules   # scoped: only dependents pinned to ONE concept (propagation fast-path)
   python3 defines_provenance.py --version      # print version
 
-== Concept-scoped DEPENDS_ON (0.3.0, opt-in; file-level remains the default) ==
-  A DEPENDS_ON value MAY suffix `#concept` to scope the dependency to ONE concept the target DEFINES,
-  e.g. `<!-- DEPENDS_ON: rules/auth.md#session-rules -->`. A bare path (`rules/auth.md`) = whole-file,
-  the always-relevant default. `--dependents … --concept X` then narrows propagation to the dependents
+== Concept-scoped DEPENDS_ON (0.3.0) ==
+  Scope a focused dependent at creation: a file that derives from just ONE concept the target DEFINES
+  suffixes `#concept` — e.g. `<!-- DEPENDS_ON: rules/auth.md#session-rules -->`. A broad consumer keeps a
+  bare path (`rules/auth.md`) = whole-file, the always-safe default. `--dependents … --concept X` then narrows propagation to the dependents
   pinned to X (∪ unscoped ∪ a fail-safe: a `#concept` the target does NOT DEFINE is treated as unscoped,
   so a typo is never silently dropped). `--check` adds a 🟡 NON-BLOCKING advisory when a `#concept` is
   not among the target's DEFINES — it never exits 1 on it (scope correctness is a soft signal).
@@ -141,7 +142,7 @@ def extract_candidates(value):
     return out
 
 
-# ── concept-scoped DEPENDS_ON grammar (0.3.0, opt-in) ───────────────────────────────
+# ── concept-scoped DEPENDS_ON grammar (0.3.0) ──────────────────────────────────────
 # A DEPENDS_ON value MAY suffix `#concept` to scope to ONE concept the target DEFINES, e.g.
 # `rules/auth.md#session-rules`. The suffix is a single DEFINES slug — word chars + `-` only; a `#`
 # followed by anything path-like (`notes#1.md`) is NOT a scope, so the whole value stays the path.
