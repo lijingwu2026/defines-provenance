@@ -17,9 +17,10 @@ the loop to fire on its own: **[§Wire the trigger](#wire-the-trigger--close-the
 ## The mental model first
 
 The checker only **checks** the links you declare — it **never writes your files, and never guesses
-which files relate to which.** Dependency **can't be inferred**: a tool that scanned your library and
-"figured out" the graph would just be handing you semantic *similarity* again — the exact thing that
-does **not** answer "which file actually depends on this one." So the structure has to be **declared.**
+which files relate to which.** Dependency **can't be inferred** — and it isn't a backlink either. A tool
+that scanned your library and "figured out" the graph would hand you semantic *similarity*; a `[[wikilink]]`
+web would hand you a hand-declared *association* — and neither says **which file is the SOURCE and which
+must track it.** So the structure has to be **declared — directional and owned.**
 
 LLM-assisted onboarding doesn't break that rule — it *splits* it. The agent **drafts** proposals (it
 applies a written criterion to your files — the two tests below — not a filename guess); **you declare**
@@ -71,11 +72,17 @@ It proposes in **two tables** — every proposal surfaced, nothing written until
 | `rules/testing.md` | `rules/code-style.md` | "match the project's code style" — changes if it does | high | _(accept)_ |
 | `faq.md` | `rules/code-style.md` | names it once in passing | low | reject |
 
-A DEPENDS_ON edge may **optionally** scope to a single concept the source owns — `rules/code-style.md#code-style`
-— when the file derives from just that one concept (a multi-concept source). It's opt-in; a bare path means
-whole-file, the always-relevant default. (A `#concept` column is *not* needed — write the scope inline.) Keep
-the `#concept` as the **last** token of the value — a trailing `(note)` *after* it is not parsed as a scope,
-so either drop the note or leave the edge whole-file.
+A DEPENDS_ON edge for a **focused dependent** — one that derives from just one concept the source owns
+(e.g. an ADR or single-topic doc) — should **scope to that concept** at creation:
+`rules/code-style.md#code-style`. A **broad consumer** stays a bare path — whole-file, the always-safe
+default (so do edges you're unsure about). It needs a **single-slug** concept name; if your source names
+its concepts in prose, give them a slug first. (A `#concept` column is *not* needed — write the scope
+inline.) Keep the `#concept` as the **last** token of the value — a trailing `(note)` *after* it is not
+parsed as a scope, so either drop the note or leave the edge whole-file.
+
+> **Concept-scoping is the least-proven part** of the convention — self-tested and dogfooded on the
+> author's own sources, not yet on another library. Reach for it on genuinely multi-concept sources;
+> whole-file is always safe.
 
 **Review the whole set — but you don't touch every row.** `action` defaults to **accept**: leave a row
 to take it, edit only the ones you want to **rename** or **reject**. *Confidence* is a triage aid — it
@@ -85,7 +92,7 @@ row skip your eye. Confidence = **how cleanly a row passes the tests below**, no
 **Run every proposal through this checklist** — the agent drafts against it; you confirm against it:
 
 1. **`DEFINES: X`** — *the final say on `X`: does it win if another file disagrees?* (not a file that merely *mentions* X)
-2. **`DEPENDS_ON: <src>`** — *if `<src>` changes, might this file go stale?* (a **mention is not a dependency**) — optionally scope it `<src>#concept` when you derive from just one concept the source owns.
+2. **`DEPENDS_ON: <src>`** — *if `<src>` changes, might this file go stale?* (a **mention is not a dependency**) — scope it `<src>#concept` when the file derives from exactly one concept the source owns (a focused dependent); broad and uncertain edges stay whole-file.
 3. **One home per concept** — no two files `DEFINES` the same `X`.
 4. **The concept name is the concept the file *owns*** — never invented, never a file path.
 5. **SOURCE overrides DERIVED** holds — the `DEFINES` file is the one that wins a disagreement.
@@ -99,9 +106,12 @@ Vendor defines_provenance.py (the single checker file from the defines-provenanc
 library. Read ALL my markdown files and PROPOSE, in TWO tables, which files are SOURCES (each owns a
 concept nothing else may override) and which DEPEND ON them. Use two tests — DEFINES? = "is this file
 the final say on X: does it win if another file disagrees?"; DEPENDS_ON? = "if the source changes, might
-this file go stale?" (a mention is not a dependency). A DEPENDS_ON edge MAY optionally scope to ONE
-concept the source DEFINES — write src#concept (e.g. rules/auth.md#session-rules) when the file derives
-from just that one concept; otherwise leave it whole-file (the default). For each row give: the file,
+this file go stale?" (a mention is not a dependency). For each DEPENDS_ON edge, set its scope: if the file CLEARLY derives from exactly ONE concept the source
+DEFINES (a focused dependent — e.g. an ADR or single-topic doc), scope it — write src#concept (e.g.
+rules/auth.md#session-rules). If it draws on the source broadly, leave it whole-file. If you are unsure
+which, leave it whole-file (the always-safe default) and FLAG it — show the candidate src#concept with a
+low/medium confidence so I can decide; high confidence = clearly focused, scope it. Scope only clear
+focused dependents by default; whole-file covers broad and uncertain edges. For each row give: the file,
 the proposed concept name (or the source it depends on), a
 one-line reason, and a confidence = how cleanly it passes the test (NOT a filename match). Run every
 proposal through this checklist: (1) DEFINES = final say, not a mention; (2) DEPENDS_ON = real
@@ -110,7 +120,7 @@ a file path, never invented; (5) SOURCE overrides DERIVED. DRAFT only — never 
 name, or tag freely until I confirm. Surface ALL proposals so I review the whole set: I accept a row by
 leaving it, and rename or reject the ones I change. After I confirm, write the markers, then wire the
 trigger hook so edits re-check dependents automatically.
-When you CREATE a new .md file, tag it: add <!-- DEFINES: X --> if it owns a concept or <!-- DEPENDS_ON: <src> --> if it derives from one, per CONVENTION.md.
+When you CREATE a new .md file, tag it: add <!-- DEFINES: X --> if it owns a concept, or <!-- DEPENDS_ON: <src> --> if it derives from one — scoped to <src>#concept if it derives from exactly one concept the source DEFINES — per CONVENTION.md.
 ```
 
 > **Tip — a second pair of eyes (optional).** If your runtime supports it, after the draft, open a
